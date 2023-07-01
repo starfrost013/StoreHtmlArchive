@@ -46,7 +46,9 @@ HttpClient hc = new();
 #region Main part of script
 Console.WriteLine("Finding valid client versions... [472-670 - later Win8]");
 
-FindUrls(win80BaseUrl, 472, 614, 32);
+// a wider scope was tested. this contains everything that exists and can be accessed
+FindUrls(win80BaseUrl, 472, 614, 32); // originally 14
+
 FindUrls(win80BaseUrl, 615, 615, 87);
 FindUrls(win80BaseUrl, 616, 670, 32);
 
@@ -59,20 +61,21 @@ FindUrls(win81BaseUrl, 776, 776, 191);
 FindUrls(win81BaseUrl, 777, 787, 31);
 FindUrls(win81BaseUrl, 788, 788, 315);
 
-
 Console.WriteLine("Downloading WinJS content...");
-//DownloadWinJS(win80BaseUrl, 472, 670);
+DownloadWinJS(win80BaseUrl, 472, 670);
 DownloadWinJS(win81BaseUrl, 726, 788);
 
 Console.WriteLine("Downloading static content...");
-
 DownloadHtml(win80BaseUrl, 472, 670);
 DownloadHtml(win81BaseUrl, 726, 788);
 
 Console.WriteLine("Downloading BI/Instrumentation content...");
-
 DownloadMisc(win80BaseUrl, 472, 670);
 DownloadMisc(win81BaseUrl, 726, 788);
+
+
+
+DownloadMisc(win80BaseUrl, 472, 670);
 
 Console.WriteLine("Done.");
 
@@ -89,6 +92,10 @@ void FindUrls(string baseUrl, int initialClientVersion, int finalClientVersion, 
         {
             Console.WriteLine($"Client version {clientVersion} exists, scanning page versions 1-{maximumPageVersion} (this may take a while)...");
 
+            // we will create a folder that doesnt exist if the url format for page versions is unknown for a client version if we don't check
+            // see: v100
+            Directory.CreateDirectory($"{clientVersion}");
+
             for (int pageVersion = 1; pageVersion <= maximumPageVersion; pageVersion++)
             {
                 HttpResponseMessage getPageVersionMsg = hc.Send(new HttpRequestMessage(HttpMethod.Head, $"{baseUrl}/{clientVersion}/WW/en-us/0/{pageVersion}"));
@@ -97,7 +104,6 @@ void FindUrls(string baseUrl, int initialClientVersion, int finalClientVersion, 
                 {
                     Console.WriteLine($"Found client version {clientVersion}.{pageVersion}!");
                     clientVersions.Add(new(clientVersion, pageVersion));
-                    Directory.CreateDirectory($"{clientVersion}\\{pageVersion}");
                 }
             }
         }
@@ -108,8 +114,8 @@ void DownloadWinJS(string baseUrl, int minimumClientVersion, int maximumClientVe
 {
     foreach (WinStoreVersion version in clientVersions)
     {
-        if (version.ClientVersion <= minimumClientVersion
-            || version.ClientVersion >= maximumClientVersion) continue;
+        if (version.ClientVersion < minimumClientVersion
+            || version.ClientVersion > maximumClientVersion) continue;
 
         string finalOutFolder = $"{version.ClientVersion}\\WinJS\\";
         if (version.ClientVersion >= 479) finalOutFolder = $"{version.ClientVersion}\\WinJS\\{version.PageVersion}\\";
@@ -143,15 +149,16 @@ void DownloadHtml(string baseUrl, int minimumClientVersion, int maximumClientVer
 {
     foreach (WinStoreVersion version in clientVersions)
     {
-        if (version.ClientVersion <= minimumClientVersion
-            || version.ClientVersion >= maximumClientVersion) continue;
+        if (version.ClientVersion < minimumClientVersion
+            || version.ClientVersion > maximumClientVersion) continue;
 
-        string finalOutFolder = $"{version.ClientVersion}\\WW\\en-US\\{version.PageVersion}\\";
+        string finalOutFolder = $"{version.ClientVersion}\\WW\\en-US\\0\\{version.PageVersion}\\";
+
         Directory.CreateDirectory(finalOutFolder);
 
         foreach (string mainFolderFileName in mainFolderFileNames)
         {
-            string finalUrl = $"{baseUrl}/{version.ClientVersion}/WW/en-US/{version.PageVersion}/{mainFolderFileName}";
+            string finalUrl = $"{baseUrl}/{version.ClientVersion}/WW/en-US/0/{version.PageVersion}/{mainFolderFileName}";
             Console.WriteLine($"Downloading {finalUrl}...");
 
             var winJsStream = hc.GetByteArrayAsync(finalUrl);
@@ -174,15 +181,23 @@ void DownloadMisc(string baseUrl, int minimumClientVersion, int maximumClientVer
 {
     foreach (WinStoreVersion version in clientVersions)
     {
-        if (version.ClientVersion <= minimumClientVersion
-            || version.ClientVersion >= maximumClientVersion) continue;
+        if (version.ClientVersion < minimumClientVersion
+            || version.ClientVersion > maximumClientVersion) continue;
 
         string finalOutFolder = $"{version.ClientVersion}\\BI\\{version.PageVersion}\\";
+
+        if (version.ClientVersion < 479
+            || (version.ClientVersion == 479) && version.ClientVersion < 3) finalOutFolder = $"{version.ClientVersion}\\BI\\";
+
         Directory.CreateDirectory(finalOutFolder);
 
         foreach (string miscFileName in miscFileNames)
         {
             string finalUrl = $"{baseUrl}/{version.ClientVersion}/BI/{version.PageVersion}/{miscFileName}";
+
+            if (version.ClientVersion < 479
+                || (version.ClientVersion == 479) && version.ClientVersion < 3) finalUrl = $"{baseUrl}/{version.ClientVersion}/BI/{miscFileName}";
+
             Console.WriteLine($"Downloading {finalUrl}...");
 
             var winJsStream = hc.GetByteArrayAsync(finalUrl);

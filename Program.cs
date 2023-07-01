@@ -73,8 +73,6 @@ Console.WriteLine("Downloading BI/Instrumentation content...");
 DownloadMisc(win80BaseUrl, 472, 670);
 DownloadMisc(win81BaseUrl, 726, 788);
 
-
-
 DownloadMisc(win80BaseUrl, 472, 670);
 
 Console.WriteLine("Done.");
